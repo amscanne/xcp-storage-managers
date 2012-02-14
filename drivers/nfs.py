@@ -69,7 +69,18 @@ def soft_mount(mountpoint, remoteserver, remotepath, transport):
     options = "soft,timeo=%d,retrans=%d,%s" % (SOFTMOUNT_TIMEOUT,
                                                SOFTMOUNT_RETRANS,
                                                transport)
-    options += ',noac' # CA-27534
+
+    # Attribute caching can lead to stale data, so we can try to minimize these
+    # problems by reducing the caching time. Going right down to zero does not
+    # remove race conditions (rather just makes them more unlikely) while
+    # introducing some serious performance penalties for the NFS filesystem.
+    # So we get 99% of the way there without the massive performance penalties
+    # by going for 1 second.
+    # The correct solution to cases where you need up-to-date information is to
+    # use file locking primitives, as the lock operation will force the
+    # getattr() and ensure no concurrent operations.
+    options += ',acregmax=1'
+    options += ',acdirmax=1'
 
     try:
         util.ioretry(lambda: 
